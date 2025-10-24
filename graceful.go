@@ -2,7 +2,7 @@ package graceful
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,6 +15,17 @@ type ctxTopContextKey string
 const cancelFuncKey = ctxValueKey("cancelFunc")
 const signalContextKey = ctxTopContextKey("signalContext")
 
+var logger *slog.Logger 
+
+func init() {
+	logger = slog.New(slog.DiscardHandler)
+}
+
+// SetLogger sets logger
+func SetLogger(l *slog.Logger) {
+	logger = l
+}
+
 func Context(parentCtx context.Context, shutdownWait time.Duration) (context.Context, context.CancelFunc, func(*http.Server)) {
 	signalCtx, stop := signal.NotifyContext(parentCtx, os.Interrupt)
 	ctx := context.WithValue(signalCtx, signalContextKey, signalCtx)
@@ -25,9 +36,9 @@ func Context(parentCtx context.Context, shutdownWait time.Duration) (context.Con
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), shutdownWait)
 		defer cancel()
 
-		log.Println("T26: Gracefull Shutdown: started")
+		logger.Info("graceful,T26: Gracefull Shutdown: started")
 		err := server.Shutdown(timeoutCtx)
-		log.Println("T27: Gracefull Shutdowned:", err)
+		logger.Info("graceful,T27: Gracefull Shutdowned:", slog.Any("error", err))
 
 	}
 	return ctx, stop, waitShutdown
@@ -44,7 +55,7 @@ func Cancel(ctx context.Context) {
 func TopContext(ctx context.Context) context.Context {
 	if c := ctx.Value(signalContextKey); c != nil {
 		if topCtx, ok := c.(context.Context); ok {
-			log.Println("T47: TopContext")
+			logger.Info("graceful,T47: TopContext")
 			return topCtx
 		}
 	}
